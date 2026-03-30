@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronología del Libertador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: #fdfbf7;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4c5b0' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            margin: 0;
+            overflow: hidden; 
+        }
+
+        .timeline-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #3b82f6 #f1f5f9;
+        }
+        .timeline-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+        .timeline-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+        .timeline-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #f1f5f9; }
+        .timeline-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        #tooltip, #event-tooltip { transition: opacity 0.15s ease-in-out; z-index: 9999; }
+        
+        .patriarch-bar { transition: all 0.2s ease; }
+        
+        .patriarch-bar.highlighted { z-index: 50 !important; }
+        .patriarch-bar.highlighted .bar-line {
+            transform: scaleY(1.3);
+            filter: brightness(1.1);
+        }
+        .patriarch-bar.highlighted .name-label {
+            color: #ffffff !important; 
+            background-color: #1e293b !important;
+            transform: scale(1.05);
+        }
+        
+        .patriarch-bar:hover .bar-line {
+            transform: scaleY(1.5);
+            filter: brightness(1.2);
+        }
+
+        .event-diamond {
+            width: 12px;
+            height: 12px;
+            background-color: white;
+            border: 2px solid #0f172a; 
+            box-shadow: 0 0 6px rgba(0,0,0,0.4);
+        }
+
+        /* Estilos para el mensaje oculto interactivo en la línea de tiempo */
+        .hidden-message-part {
+            color: #b45309; /* amber-700 */
+            font-size: 12px;
+            font-style: italic;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(2px);
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+
+        .hidden-message-part.active-group {
+            background-color: #9a3412 !important; /* orange-800 - dark orange */
+            color: #ffffff !important;
+            transform: scale(1.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+        }
+
+        .jesus-glow {
+            animation: pulse-glow 2s infinite alternate;
+        }
+        @keyframes pulse-glow {
+            from { box-shadow: 0 0 10px rgba(234, 88, 12, 0.6); }
+            to { box-shadow: 0 0 30px rgba(234, 88, 12, 1); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen flex flex-col">
+
+    <div class="fixed bottom-6 left-6 z-50 flex flex-col gap-3">
+        <button id="toggle-books-btn" class="bg-white/95 backdrop-blur shadow-xl rounded-full px-5 py-3 border border-amber-300 text-amber-800 font-bold text-sm cursor-pointer hover:bg-amber-100 transition-colors flex items-center gap-2">
+            <i class="fas fa-book-open"></i> Libros Bíblicos
+        </button>
+    </div>
+
+    <div class="fixed bottom-6 right-6 z-50 group">
+        <div class="bg-white/95 backdrop-blur shadow-xl rounded-full w-14 h-14 flex items-center justify-center border border-amber-300 text-amber-700 cursor-pointer hover:bg-amber-50 hover:scale-105 transition-all group-hover:rounded-br-none">
+            <i class="fas fa-search-plus text-2xl"></i>
+        </div>
+        <div class="absolute bottom-full right-0 mb-3 bg-white/95 backdrop-blur shadow-2xl rounded-xl p-5 border border-amber-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-bottom-right group-hover:translate-y-0 translate-y-2 flex flex-col items-center gap-3">
+            <label for="zoom-slider" class="text-xs font-bold text-slate-700 uppercase tracking-wide">Ajustar Escala</label>
+            <div class="flex items-center gap-3">
+                <i class="fas fa-compress-alt text-slate-400"></i>
+                <input type="range" id="zoom-slider" min="2000" max="15000" value="6500" class="w-48 accent-amber-600 cursor-pointer">
+                <i class="fas fa-expand-alt text-slate-400"></i>
+            </div>
+        </div>
+    </div>
+
+    <main class="w-full h-screen overflow-auto timeline-scroll relative pb-10 px-4 md:px-10 pt-2">
+        <div id="chart-container" class="relative bg-white/60 border border-slate-300 shadow-inner rounded-xl mx-auto overflow-hidden px-[30px] transition-all duration-300 ease-out" style="width: 6500px;">
+            <div id="chart-draw-area" class="relative w-full h-full cursor-crosshair">
+                
+                <div id="bg-esclavitud" class="absolute top-0 bottom-0 bg-[#eedaab]/30 z-0 border-l border-r border-[#d4b986] pointer-events-none transition-all">
+                    <div class="absolute top-6 left-1/2 -translate-x-1/2 text-[#a88241] font-bold text-xs uppercase tracking-widest whitespace-nowrap bg-white/60 px-2 py-0.5 rounded backdrop-blur-sm">
+                        <i class="fas fa-link text-[10px] mr-1"></i> Esclavitud en Egipto
+                    </div>
+                </div>
+
+                <div id="bg-jueces" class="absolute top-0 bottom-0 bg-[#dcfce7]/40 z-0 border-l border-r border-[#86efac]/50 pointer-events-none transition-all">
+                    <div class="absolute top-6 left-1/2 -translate-x-1/2 text-[#166534] font-bold text-xs uppercase tracking-widest whitespace-nowrap bg-white/60 px-2 py-0.5 rounded backdrop-blur-sm shadow-sm">
+                        <i class="fas fa-balance-scale text-[10px] mr-1"></i> Época de los Jueces
+                    </div>
+                </div>
+
+                <div id="bg-reyes" class="absolute top-0 bottom-0 bg-[#f3e8ff]/40 z-0 border-l border-r border-[#d8b4fe]/50 pointer-events-none transition-all">
+                    <div class="absolute top-6 left-1/2 -translate-x-1/2 text-[#6b21a8] font-bold text-xs uppercase tracking-widest whitespace-nowrap bg-white/60 px-2 py-0.5 rounded backdrop-blur-sm shadow-sm">
+                        <i class="fas fa-crown text-[10px] mr-1"></i> Época de los Reyes
+                    </div>
+                </div>
+
+                <div id="bg-exilio" class="absolute top-0 bottom-0 bg-[#fef08a]/30 z-0 border-l border-r border-[#fde047]/50 pointer-events-none transition-all">
+                    <div class="absolute top-6 left-1/2 -translate-x-1/2 text-[#854d0e] font-bold text-xs uppercase tracking-widest whitespace-nowrap bg-white/60 px-2 py-0.5 rounded backdrop-blur-sm shadow-sm">
+                        <i class="fas fa-link text-[10px] mr-1"></i> Exilio en Babilonia
+                    </div>
+                </div>
+
+                <div id="bg-jesus" class="absolute top-0 bottom-0 bg-[#fef9c3]/50 z-0 border-l border-r border-[#fde047]/60 pointer-events-none transition-all">
+                    <div class="absolute top-6 left-1/2 -translate-x-1/2 text-[#a16207] font-bold text-xs uppercase tracking-widest whitespace-nowrap bg-white/70 px-2 py-0.5 rounded backdrop-blur-sm shadow-sm">
+                        <i class="fas fa-star text-[10px] mr-1"></i> Vida de Jesucristo
+                    </div>
+                </div>
+
+                <div id="grid-bg" class="absolute inset-0 pointer-events-none z-0"></div>
+                <div id="grid-top-labels" class="sticky top-0 w-full h-0 z-[60] pointer-events-none"></div>
+                <div id="grid-bottom-labels" class="sticky bottom-0 w-full h-0 z-[60] pointer-events-none"></div>
+                <div id="events-container" class="absolute inset-0 z-10 pointer-events-none"></div>
+                <div class="absolute top-[0px] bottom-[20px] left-0 w-[3px] bg-red-600 z-10 pointer-events-none"></div>
+                <div id="bars-container" class="absolute inset-0 z-20 pointer-events-none"></div>
+
+                <div id="time-cursor" class="absolute top-0 bottom-0 w-[2px] bg-amber-500/80 shadow-[0_0_8px_rgba(245,158,11,0.5)] hidden pointer-events-none z-30 transform -translate-x-1/2 transition-opacity duration-200">
+                    <div class="sticky top-0 w-full h-0 overflow-visible z-[70]">
+                        <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-amber-600 text-white text-[11px] font-bold px-2 py-1.5 rounded shadow whitespace-nowrap flex flex-col items-center">
+                            <span id="tc-am-top" class="leading-none">0 AM</span>
+                            <span id="tc-ac-top" class="text-[11px] text-amber-200 mt-1 leading-none">4004 a.C.</span>
+                        </div>
+                    </div>
+                    <div class="sticky bottom-0 w-full h-0 overflow-visible z-[70]">
+                        <div class="absolute bottom-12 left-1/2 transform -translate-x-1/2 bg-slate-700 text-white text-[11px] font-bold px-2 py-1.5 rounded shadow whitespace-nowrap flex flex-col items-center">
+                            <span id="tc-am-bottom" class="leading-none">0 AM</span>
+                            <span id="tc-ac-bottom" class="text-[11px] text-slate-400 mt-1 leading-none">4004 a.C.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="books-wrapper" class="absolute bottom-0 left-0 right-0 h-0 opacity-0 transition-all duration-300 border-t border-dashed border-amber-900/30 bg-gradient-to-t from-[#e8dcc4] to-transparent pointer-events-none">
+                    <div id="books-container" class="absolute inset-0 pt-4"></div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <div id="tooltip" class="fixed opacity-0 pointer-events-none bg-white border border-amber-300 shadow-2xl rounded-lg p-3 w-[260px] transform -translate-x-1/2 -translate-y-full mt-[-15px] z-[9999]">
+        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-amber-300 border-r-[8px] border-r-transparent"></div>
+        <div class="absolute -bottom-[7px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-t-[7px] border-t-white border-r-[7px] border-r-transparent"></div>
+        
+        <div class="text-center mb-1">
+            <span id="tt-age" class="font-bold text-blue-800 text-[13px] bg-slate-50 px-2 py-1 rounded border border-slate-100 block"></span>
+        </div>
+        <div class="pt-1 text-center">
+            <p id="tt-role" class="text-slate-600 text-[13px] leading-snug"></p>
+        </div>
+    </div>
+
+    <div id="event-tooltip" class="fixed opacity-0 pointer-events-none bg-slate-800 text-white p-3 rounded-lg text-sm shadow-2xl w-72 transform -translate-x-1/2 -translate-y-full mt-[-10px] z-[10000] border border-slate-600">
+        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-slate-800 border-r-[8px] border-r-transparent"></div>
+        <strong id="ev-tt-title" class="block text-amber-300 font-bold uppercase mb-1 border-b border-slate-600 pb-1"></strong>
+        <p id="ev-tt-desc" class="text-slate-200 leading-snug mt-1 text-[13px]"></p>
+    </div>
+
+    <script>
+        const MAX_YEAR = 4100;
+
+        // --- 1. DATOS UNIFICADOS ---
+        const timelineEntities = [
+            { name: "Adán", birthAM: 0, deathAM: 930, role: "El primer portador de la imagen de Dios, tras la caída, recibió la promesa del Libertador que heriría la cabeza de la serpiente.", hiddenMessage: "(El) hombre (es)", events: [{ year: 120, title: "Caín mata a Abel", desc: "Caín mató a Abel antes de que Adán cumpliera 130 años." }] },
+            { name: "Set", birthAM: 130, deathAM: 1042, role: "La simiente designada por Dios para preservar la esperanza del Libertador tras la pérdida de Abel.", hiddenMessage: "concedido", events: [] },
+            { name: "Enós", birthAM: 235, deathAM: 1140, role: "Aquel que reconoció la fragilidad humana, impulsando a la humanidad a invocar el nombre del Señor en busca de su Salvador.", hiddenMessage: "mortal", events: [] },
+            { name: "Cainán", birthAM: 325, deathAM: 1235, role: "El recordatorio de que, en medio del lamento por el pecado, la mayor posesión del hombre es la promesa de rescate.", hiddenMessage: "tristeza", events: [] },
+            { name: "Mahalaleel", birthAM: 395, deathAM: 1290, role: "Aun en un mundo caído, la fidelidad de Dios al cumplir Su promesa es motivo de eterna alabanza.", hiddenMessage: "(pero el) Dios bendito", events: [] },
+            { name: "Jared", birthAM: 460, deathAM: 1422, role: "Una sombra profética de Aquel que, siendo Dios, habría de descender de su trono para habitar entre los hombres y redimirlos.", hiddenMessage: "vendrá a nosotros", events: [] },
+            { name: "Enoc", birthAM: 622, deathAM: 987, role: "El hombre que caminó con Dios, enseñando que la verdadera vida se encuentra en la comunión con el Prometido.", note: "Trasladado", hiddenMessage: "enseñando", events: [{ year: 987, title: "Trasladado (Judas 14-15)", desc: "Enoc profetizó el juicio; desapareció porque Dios se lo llevó." }] },
+            { name: "Matusalén", birthAM: 687, deathAM: 1656, role: "Su nombre significa 'cuando él muera, vendrá (el juicio del pecado)'. El símbolo de la paciencia divina, cuya vida anunció que solo a través de una muerte necesaria vendría la renovación del mundo.", hiddenMessage: "(que) su muerte traerá", events: [] },
+            { name: "Lamec", birthAM: 874, deathAM: 1651, role: "Aquel que expresó el agotamiento por la maldición de la tierra, suspirando por el alivio que el Libertador traería.", hiddenMessage: "(a los) desesperados", events: [] },
+            { name: "Noé", birthAM: 1056, deathAM: 2006, role: "El tipo del Mesías que, al atravesar el juicio, preservó la vida y trajo el verdadero descanso a la humanidad.", hiddenMessage: "consolación o descanso.", events: [{ year: 1656, title: "El Diluvio", desc: "Dios cumple su juicio pero preserva la humanidad por amor a su promesa." }] },
+            { name: "Sem (Nombre/Renombre)", birthAM: 1558, deathAM: 2158, role: "El portador de la bendición de Noé, de cuyo linaje vendría aquel cuyo 'Nombre' es sobre todo nombre para restaurar la gloria perdida.", events: [] },
+            { name: "Arfaxad (Fortaleza/Sanador)", birthAM: 1658, deathAM: 2096, role: "La semilla que brotó con fuerza tras el juicio del diluvio, preservando la línea elegida para la sanación de todas las naciones.", events: [] },
+            { name: "Sala (Petición/Brote)", birthAM: 1693, deathAM: 2126, role: "Un eslabón que se extiende como un brote hacia el futuro, manteniendo viva la petición de la humanidad por un redentor.", events: [] },
+            { name: "Heber (El que cruza/Del otro lado)", birthAM: 1723, deathAM: 2187, role: "Ancestro epónimo de los hebreos, aquel que nos recuerda que el pueblo del Libertador son peregrinos que cruzan de la muerte a la vida.", events: [] },
+            { name: "Peleg (División)", birthAM: 1757, deathAM: 1996, role: "Aunque el mundo se dividió en Babel, su vida marcó la separación de un linaje apartado exclusivamente para el cumplimiento de la promesa.", events: [] },
+            { name: "Reu (Amigo/Compañero)", birthAM: 1787, deathAM: 2026, role: "Un recordatorio de que el objetivo final de la redención es restaurar la amistad y la comunión entre el Creador y su creación.", events: [] },
+            { name: "Serug (Rama/Brote)", birthAM: 1819, deathAM: 2049, role: "Una prefiguración de la 'Rama' justa que habría de nacer para dar sombra y descanso a un mundo fatigado por el pecado.", events: [] },
+            { name: "Nacor (Anhelante/Respirar fuerte)", birthAM: 1849, deathAM: 1997, role: "El testimonio de una creación que gime y anhela profundamente el aliento de vida que solo el Mesías puede otorgar.", events: [] },
+            { name: "Taré (Estación/Viajero)", birthAM: 1878, deathAM: 2083, role: "Padre de Abraham. Representa el momento de tránsito y salida de la idolatría antigua hacia el camino de la fe que conduce a la Tierra Prometida.", events: [] },
+            { name: "Abraham (Padre de multitudes)", birthAM: 2008, deathAM: 2183, role: "El hombre del pacto, a quien se le prometió que en su 'Simiente' (el Libertador) serían benditas todas las familias de la tierra.", events: [{ year: 2108, title: "Nace Isaac", desc: "Nacimiento del hijo de la promesa a los 100 años de Abraham." }], priority: 10 },
+            { name: "Isaac (Risa)", birthAM: 2108, deathAM: 2288, role: "El hijo del milagro y el sacrificio, cuya obediencia en el monte Moriá señaló al Cordero de Dios que quitaría el pecado del mundo.", priority: 5, events: [] },
+            { name: "Jacob (Sostenido por el talón/Israel)", birthAM: 2168, deathAM: 2315, role: "El patriarca que luchó con Dios y prevaleció pero solo cuando se vio vencido", events: [] },
+            { name: "Leví (Unido)", birthAM: 2255, deathAM: 2392, role: "El antecesor del sacerdocio, cuya función apunta al Mediador perfecto que uniría para siempre a Dios con su pueblo.", events: [] },
+            { name: "Judá (Alabanza)", birthAM: 2256, deathAM: 2385, role: "El portador del cetro real, de cuya tribu nacería el 'León de Judá' para gobernar con justicia y misericordia eterna.", events: [] },
+            { name: "José (Que Dios añada)", birthAM: 2259, deathAM: 2369, role: "El hijo amado, rechazado y exaltado a salvador, que tipifica al Libertador que provee el 'Pan de Vida' incluso a quienes lo traicionaron.", events: [] },
+            { name: "Aarón (Iluminado/Excelso)", birthAM: 2430, deathAM: 2552, role: "El primer Sumo Sacerdote, cuya intercesión y vestiduras gloriosas reflejaban la luz del que vendría a ofrecer el sacrificio definitivo.", events: [] },
+            { name: "Moisés (Sacado de las aguas)", birthAM: 2433, deathAM: 2553, role: "El mediador de la Ley y el libertador del Éxodo, quien anunció que Dios levantaría a un Profeta mayor que él para guiar al pueblo a la libertad total.", events: [{ year: 2513, title: "La Ley", desc: "La Ley fue dada 50 días después de la salida de Egipto." }] },
+
+            { name: "Los Jueces", birthAM: 2553, deathAM: 2909, role: "Líderes levantados para liberar a Israel.", color: "bg-teal-500", events: [
+                { year: 2593, title: "Otoniel (León de Dios)", desc: "El primer juez que manifestó la fuerza del Espíritu para dar reposo a la tierra, prefigurando al 'León de la tribu de Judá' que vencerá a todos nuestros opresores." },
+                { year: 2653, title: "Aod (Unido/Elogio)", desc: "El libertador que trajo una victoria singular y sorprendente, recordándonos que el Mesías vendría de forma inesperada para herir mortalmente al enemigo de nuestras almas." },
+                { year: 2673, title: "Samgar (Espada/Forastero)", desc: "Mató a 600 filisteos con una aguijada de bueyes. quel que con una herramienta humilde salvó a Israel, señalando que el Libertador no necesitaría de ejércitos humanos, sino del poder de Su propia palabra para darnos la victoria." },
+                { year: 2713, title: "Débora (Abeja/Palabra)", desc: "La profetisa cuya sabiduría trajo orden y dirección, representando la dulzura y el aguijón de la Palabra de Dios que guía al pueblo hacia su redención." },
+                { year: 2753, title: "Gedeón (Guerrero/Talador)", desc: "Venció a los madianitas con solo 300 hombres. El que derribó los altares falsos y venció con un pequeño remanente, tipificando al Libertador que conquista no con espada, sino con la luz y el estruendo de Su sacrificio." },
+                { year: 2796, title: "Tola (Gusano/Carmesí)", desc: "Juzgó a Israel 23 años. como en el Salmo 22, aquel que dio paz a Israel durante años, recordándonos el precio 'carmesí' que el Libertador pagaría por nuestra paz." },
+                { year: 2818, title: "Jair (Él ilumina)", desc: "Aquel cuyo nombre y descendencia trajeron estabilidad, reflejando al Mesías como la 'Luz del mundo' que disipa las tinieblas de la confusión espiritual." },
+                { year: 2836, title: "Jefté (Él abre/Dios libera)", desc: "El hombre rechazado que se convirtió en cabeza y salvador, una imagen clara de la 'piedra que desecharon los edificadores' y que Dios abrió como camino de libertad." },
+                { year: 2843, title: "Ibzán (Espléndido/Ilustre)", desc: "Su vida llena de descendencia y paz en Belén (curiosamente la ciudad del Mesías) apunta al esplendor del Reino que el Libertador establecería para Sus hijos." },
+                { year: 2853, title: "Elón (Roble/Fuerte)", desc: "Representa la firmeza y la estabilidad de la promesa divina que permanece inamovible a pesar de la infidelidad constante del pueblo." },
+                { year: 2861, title: "Abdón (Servicio/Siervo)", desc: "Un recordatorio de que el verdadero liderazgo en el Reino de Dios se manifiesta en el servicio, prefigurando al 'Siervo Sufriente' que daría Su vida por muchos." },
+                { year: 2881, title: "Sansón (Del sol/Pequeño sol)", desc: "El nazareo de fuerza sobrenatural que, a través de su propia muerte, destruyó a más enemigos que en toda su vida; el tipo más dramático del Libertador que vence al morir." }
+            ] },
+            { name: "Samuel (Escuchado por Dios)", birthAM: 2880, deathAM: 2994, role: "El profeta que cerró la era de los jueces y ungió a los reyes, representando al Libertador que escucha el clamor de Su pueblo y establece un Reino eterno de justicia.", color: "bg-teal-600", events: [] },
+            
+            // Ajuste de los Reyes: Vinculamos Saúl a Los Jueces para iniciar la escalera
+            { name: "Rey Saúl", birthAM: 2954, deathAM: 2994, role: "Primer rey de Israel.", color: "bg-purple-500", events: [], linkRowWith: "Los Jueces" },
+            { name: "Rey David", birthAM: 2994, deathAM: 3034, role: "Recibió el pacto davídico mesiánico.", color: "bg-purple-600", events: [] },
+            { name: "Rey Salomón", birthAM: 3034, deathAM: 3074, role: "Construyó el Templo.", color: "bg-purple-500", 
+            events: 
+            [{ year: 3044, title: "1er Templo (960 a.C.)", desc: "Finaliza la construcción del Templo de Salomón en Jerusalén." }] },
+            
+            { name: "Reino de Israel", birthAM: 3074, deathAM: 3282, role: "Reino de 10 tribus. Exiliados por Asiria.", color: "bg-orange-500", events: [{ year: 3282, title: "Deportación a Asiria (722 a.C.)", desc: "Caída y deportación de las 10 tribus." }] },
+            { name: "Reino de Judá", birthAM: 3074, deathAM: 3416, role: "Reino de 2 tribus. Linaje de David.", color: "bg-red-500", 
+            events: [
+                { year: 3094, title: "Asa (910 a.C.)", desc: "El primer reformador; eliminó ídolos y restauró el pacto con Dios." },
+                { year: 3132, title: "Josafat (872 a.C.)", desc: "Estableció un sistema judicial y educativo basado en la Ley de Dios." },
+                { year: 3169, title: "Joás (835 a.C.)", desc: "Coronado de niño tras ser salvado por Joiada; reparó el Templo." },
+                { year: 3289, title: "Ezequías (715 a.C.)", desc: "Resistió el asedio asirio y purificó el Templo." },
+                { year: 3364, title: "Josías (640 a.C.)", desc: "El último gran reformador; halló el Libro de la Ley y celebró la Pascua." },
+                { year: 3412, title: "La presencia de Dios abandona el Templo (592 a.C.)", desc: "Se debió a la idolatría y corrupción extrema del pueblo y sus líderes, quienes habían profanado el santuario con imágenes paganas." },
+                { year: 3417, title: "Caída de Judá (587 a.C.)", desc: "El imperio Babilonio destruye Jerusalén y el Templo." }
+                ] },
+            
+            { name: "Imperio Asirio", birthAM: 3151, deathAM: 3396, role: "Conquistó y deportó al Reino de Israel.", color: "bg-orange-600", isEmpire: true, icon: "fa-chess-rook", events: [] },
+            { name: "Imperio Babilonia", birthAM: 3396, deathAM: 3464, role: "Destruyó Jerusalén y llevó a Judá al exilio.", color: "bg-yellow-600", isEmpire: true, icon: "fa-fire", events: [] },
+            { name: "Imperio Persa", birthAM: 3464, deathAM: 3674, role: "Permitió el retorno de los judíos a Jerusalén.", color: "bg-pink-600", isEmpire: true, icon: "fa-scroll", linkRowWith: "Imperio Asirio", 
+            events: [
+                { year: 3604, title: "El último profeta", desc: "Malaquías fue el último en hablar a un pueblo con apatía espiritual y corrupción sacerdotal." }
+            ] },
+            
+            { name: "Imperio Griego", birthAM: 3671, deathAM: 3681, role: "Alejandro Magno conquista el imperio Persa.", color: "bg-blue-600", isEmpire: true, icon: "fa-horse-head", 
+              events: [ { year: 3672, title: "Alejandro en Jerusalén", desc: "Alejandro Magno visita Jerusalén (332 a.C.). Muere en el 323 a.C." } ] },
+            { name: "Egipto (Ptolomeos)", birthAM: 3681, deathAM: 3806, role: "Dinastía griega en Egipto.", color: "bg-teal-500", isEmpire: true, icon: "fa-eye",
+              events: [ 
+                { year: 3703, title: "Ptolomeo I Sóter (301 a.C.)", desc: "Consolida el control de Judea. Llevó a miles de judíos a Alejandría, donde formaron una comunidad próspera y privilegiada." },
+                { year: 3711, title: "Ptolomeo II Filadelfo (285 a.C.)", desc: "Ordeno la traducción de las escrituras hebreas al griego. Reunió a 72 sabios judíos en la isla de Faro (Alejandría) para que el mundo helénico pudiera entender la ley de Moisés." },
+                { year: 3754, title: "La Septuaginta (250 a.C.)", desc: "Traducción de las escrituras al griego." },
+                { year: 3787, title: "La Ofrenda de la Soberbia (217 a.C.)", desc: "Ptolomeo IV visitó Jerusalén. Según los relatos, intentó entrar al Lugar Santísimo del Templo, el rey fue castigado con una parálisis temporal por intervención divina." }
+                 ] },
+            { name: "Sirios (Seléucidas)", birthAM: 3681, deathAM: 3862, role: "Dinastía griega en Siria. Época de Antíoco Epífanes.", color: "bg-green-600", isEmpire: true, icon: "fa-gopuram", linkRowWith: "Imperio Asirio",
+              events: [ 
+                { year: 3804, title: "Antíoco III el Grande (200 a.C.)", desc: "El Imperio Seléucida le arrebató el control de Judea a los Ptolomeos de Egipto." },
+                { year: 3824, title: "Antíoco IV Epífanes (176 a.C.)", desc: "Impone la cultura y religión griegas en Judea." },
+                { year: 3837, title: "Profanación (167 a.C.)", desc: "Antíoco IV Epífanes profanó el Templo de Jerusalén sacrificando una cerda sobre el altar. Caldo inmundo regado en el templo. Instala un altar a Zeus y prohibe las prácticas judías como la circuncisión y el Shabat. Mueren 40.000 judíos." },
+                { year: 3862, title: "La Independencia temporal (142 a.C.)", desc: "Demetrio II reconoce la soberanía de Judea. Se firma la paz y Judea queda exenta de tributos, naciendo oficialmente el Estado Asmoneo." }
+                ] },
+            
+            { name: "Imperio Romano", birthAM: 3939, deathAM: 4074, role: "Dominio durante el ministerio del Mesías. Inició en 753 a.C.", color: "bg-rose-700", isEmpire: true, icon: "fa-landmark", linkRowWith: "Imperio Asirio",
+              events: [
+                { year: 3939, title: "Conquista Pompeyo (65 a.C.)", desc: "Pompeyo conquista Jerusalén. 1200 muertos." },
+                { year: 3956, title: "Julio Cesar Emperador (48 a.C.)", desc: "El arquitecto del poder absoluto de Roma como Imperio. Derrota a Pompeyo y queda como líder principal de Roma." },
+                { year: 3980, title: "Construcción 2do Templo (20 a.C.)", desc: "Herodes el Grande comenzó la reconstrucción. Fue un intento político para ganarse la aceptación de sus súbditos judíos, quienes lo rechazaban por su origen idumeo y su lealtad a Roma" },
+                { year: 4074, title: "Destrucción de Jerusalen (70 d.C.)", desc: "El fin efectivo de la Gran Revuelta Judía (iniciada en el 66 d.C.) efectuado por el general romano Tito (hijo del emperador Vespasiano)" }
+                ] },
+            { name: "Exilio Babilonia", birthAM: 3417, deathAM: 3466, role: "Cautiverio de Judá.", color: "bg-yellow-500", events: [] },
+            { name: "Samaritanos", birthAM: 3317, deathAM: 4074, role: "Pueblo mixto tras la caída de Israel.", color: "bg-fuchsia-700", 
+            events: [
+                { year: 3596, title: "Templo Gerizim (408 a.C.)", desc: "Construcción del templo Samaritano. El '11avo' Mandamiento: ofrecer sacrificios en el Monte Gerizim" },
+                { year: 3876, title: "Destrucción del templo de los Samaritanos (128 a.C.)", desc: "Juan Hircano I, rey judío asmoneo destruye el templo y marcó la ruptura definitiva entre judíos y samaritanos." },
+                { year: 3940, title: "Contincantes religiosos", desc: "Odio a los judíos y a su templo." }
+                ] },
+            { 
+                name: "Sumos Sacerdotes", birthAM: 3466, deathAM: 4074, role: "Línea de sacerdotes post-exilio.", color: "bg-amber-500", 
+                events: [
+                    { year: 3466, title: "Jesúa (536 a.C.)", desc: "Retorno tras el decreto de Ciro." },
+                    { year: 3509, title: "Joaquín (490 a.C.)", desc: "Transición y consolidación tras el regreso del exilio babilónico. Aseguro que el culto diario funcionara sin interrupciones bajo el Imperio Persa." },
+                    { year: 3543, title: "El Yasib (445 a.C.)", desc: "Sacerdote en tiempos de Nehemías." },
+                    { year: 3584, title: "Joyada (420 a.C.)", desc: "El inicio de la decadencia espiritual que el profeta Malaquías denunciaría años después, donde los sacerdotes menospreciaban el altar de Dios." },
+                    { year: 3614, title: "Jonathan (400 a.C.)", desc: "Asesinó a su propio hermano, Jesúa, dentro del Templo de Jerusalén." },
+                    { year: 3644, title: "Jadua (332 a.C.)", desc: "Salió de Jerusalén vestido con sus ornamentos sagrados para recibir a Alejandro. El conquistador, en lugar de atacar, se postró ante el nombre de Dios en la tiara del sacerdote, afirmando haber visto a Jadúa en un sueño en Macedonia." },
+                    { year: 3684, title: "Onias I (320 a.C.)", desc: "Sacerdocio en el inicio de la era Ptolemaica. El Sumo Sacerdote se convirtió en la máxima autoridad civil ante los extranjeros." },
+                    { year: 3704, title: "Simón 'El Justo' (300 a.C.)", desc: "Reparó las murallas de la ciudad y fortificó el Templo, asegurando el suministro de agua mediante la construcción de un gran estanque, preparándose para las guerras entre Ptolomeos y Seléucidas." },
+                    { year: 3713, title: "Eleazar (291 a.C.)", desc: "Envió a 72 sabios (6 de cada tribu) a Alejandría para traducir la Torá al griego, permitiendo que la Ley de Dios fuera leída por todo el mundo helénico." },
+                    { year: 3728, title: "Manases (276 a.C.)", desc: "Mantiene la lealtad de Judea hacia los Ptolomeos de Egipto. Su ascenso al poder ocurrió porque el hijo legítimo de Simón el Justo, Onías II, aún era demasiado joven para ejercer el cargo." },
+                    { year: 3753, title: "Onias II (251 a.C.)", desc: "Se negó a pagar el tributo anual de 20 talentos de plata al rey Ptolomeo III Evérgetes de Egipto. Su sobrino José ben Tobías (un hombre astuto y ambicioso) intervino para calmar al rey egipcio. Esto causó que el poder civil y la recaudación de impuestos pasaran del Sumo Sacerdote a la familia de los Tobíadas, debilitando la autoridad del Templo." },
+                    { year: 3811, title: "Onias III (193 a.C.)", desc: "Último sumo sacerdote legítimo de la línea de Sadoc antes de que el cargo fuera vendido al mejor postor. Se enfrentó valientemente a Heliodoro (el enviado del rey Seleuco IV) para impedir que saqueara los fondos del Templo." },
+                    { year: 3829, title: "Jasón (175 a.C.)", desc: "Compro el cargo. Sobornó a Antíoco IV. Josué cambió su nombre a Jasón. Esto simbolizaba que su lealtad ya no estaba con las escrituras, sino con la cultura del imperio." },
+                    { year: 3851, title: "Jonatan (153 a.C.)", desc: "El Primer Sumo Sacerdote Asmoneo. nombrado por el rey sirio Alejandro Balas. Esto causó controversia, ya que los Macabeos no pertenecían a la línea tradicional de Sadoc." },
+                    { year: 3863, title: "Simón el Macabeo (141 a.C.)", desc: "El último de los cinco hijos de Matatías y el que finalmente alcanzó la soberanía total. Logró que el rey seléucida Demetrio II exonerara a Judea de pagar tributos. 'Sumo Sacerdote, Estratego y Etnarca' a perpetuidad, unificando legalmente el poder civil, militar y religioso en su familia" },
+                    { year: 3869, title: "Juan Hircano (135 a.C.)", desc: "Obligó a circuncidar y convirtió al judaísmo a los Idumeos.  Arrasó el santuario de los samaritanos en el Monte Gerizim, un acto que selló la ruptura definitiva entre judíos y samaritanos por siglos." },
+                    { year: 3890, title: "Aristóbulo (104 a.C.)", desc: "Encarceló a su propia madre (quien murió de hambre en prisión) y a tres de sus hermanos para asegurar el trono. A pesar de ser un Macabeo, se hacía llamar 'amante de los griegos'. Fue el primero en ceñirse una diadema real y exigir el título de Rey de los Judíos, uniendo formalmente la corona con el Sumo Sacerdocio." },
+                    { year: 3910, title: "Alejandro Janeo (103 a.C.)", desc: "Crucifixión masiva de 800 fariseos en Jerusalén mientras él banqueteaba con sus concubinas; ordenó que las esposas e hijos de los condenados fueran degollados ante sus ojos antes de que ellos mismos murieran." },
+                    { year: 3930, title: "Hircano (63 a.C.)", desc: "Hombre pacífico y manipulable. Su ambicioso hermano menor, Aristóbulo II, le arrebató el trono, lo que desató una guerra civil fratricida. Antípatro usó a Hircano como peón para introducir a los romanos en la política interna. Al no poder resolver el conflicto con su hermano, Hircano apeló al general romano Pompeyo. Esto resultó en la conquista de Jerusalén" },
+                    { year: 4010, title: "Anas (6 d.C.)", desc: "El patriarca en la sombra que gobernó el Templo a través de su linaje. Jesús fue llevado primero ante Anás tras su arresto. Se le atribuye el control comercial de los puestos de venta de animales y cambio de moneda en los atrios del Templo." },
+                    { year: 4022, title: "Caifás (18 d.C.)", desc: "Ejecutor político que consolidó la condena de Jesús para preservar el statu quo. Estaba casado con la hija de Anás." }
+                ]
+            },
+            
+            { name: "Ciro 'El Grande'", birthAM: 3420, deathAM: 3474, role: "Agrega Babilonia al Imperio. Decretó la reconstrucción del Templo.", color: "bg-pink-500", linkRowWith: "Los Jueces", 
+            events: [
+                { year: 3465, title: "Autorización para construir el Templo (539 a.C.)", desc: "Dios llamando a Ciro 'su siervo' 150 años antes de nacer. Isaías 44 y 45." },
+            ] },
+            
+            { name: "Zorobabel", birthAM: 3440, deathAM: 3500, role: "'NO' Rey de los Judíos. Lideró el retorno.", color: "bg-blue-600", 
+            events: [
+                { year: 3488, title: "El 2do Templo se termina (516 a.C.)", desc: "70 años después de la destrucción del primer templo por los babilonios, cumpliendo la profecía de Jeremías." }
+            ] },
+            
+            { name: "Artajerjes", birthAM: 3538, deathAM: 3580, role: "Rey persa que permitió a Nehemías reconstruir los muros en 466 a.C.", color: "bg-pink-800", events: [{ year: 3567, title: "Nehemías 2:1-4 (437 a.C.)", desc: "Permiso para reconstruir los muros de Jerusalén." }], linkRowWith: "Ciro 'El Grande'" },
+            { name: "Estado Asmoneo", birthAM: 3837, deathAM: 3939, role: "Gobierno Autónomo, Sumo Sacerdocio, Destrucción del Templo, Continuan los cultos", color: "bg-pink-400", events: 
+            [
+                { year: 3837, title: "La Rebelión (167 a.C.)", desc: "El descontento contra los invasores Seléucidas aumenta." },
+                { year: 3854, title: "Revuelta Macabea (150 a.C.)", desc: "En la ciudad de Modin, el sacerdote Matatías se negó a ofrecer sacrificios a dioses griegos. Judas (Macabeo), líder militar más famoso, quien recuperó Jerusalén y purificó el Templo (origen de la fiesta de Janucá). Jonatán, Hermano de Judas que asumió el liderazgo tras su muerte, consolidando el poder político y religioso." },
+                { year: 3862, title: "Simón el Macabeo (142 a.C.)", desc: "Consiguió que el rey seléucida Demetrio II exonerara a Judea de pagar tributos. Fue el primero en ser nombrado oficialmente por el pueblo como Príncipe y Sumo Sacerdote." },
+                { year: 3939, title: "Antípatro de Idumea (65 a.C.)", desc: "El padre de Herodes el Grande fue el maestro de la intriga que cimentó el destino de Judea bajo la sombra de Roma" }
+                ], linkRowWith: "Zorobabel" },
+            { name: "Pobres del Rebaño", birthAM: 3681, deathAM: 4000, role: "Fidelidad a las escrituras. Víctimas de la Geopolítica. Resistencia Pasiva. Desprecio por la Aristocracia Corrupta.", color: "bg-blue-400", linkRowWith: "Imperio Babilonia", events: [
+                { year: 3828, title: "Rumor muerte de Antíoco IV (168 a.C.)", desc: "Mientras asediaba Alejandría, llegó el falso rumor de que el rey había muerto en combate." },
+                { year: 3837, title: "La masacre judia (167 a.C.)", desc: "Mueren 40.000 judíos y otros vendidos como esclavos. Destrucción Murallas. Ciudad incendiada. Mujeres y niños lanzados vivos." }
+
+            ] },
+            
+            { name: "Publicanos", birthAM: 3778, deathAM: 4074, role: "Recaudadores de impuestos judíos al servicio de Roma", color: "bg-emerald-600", linkRowWith: "Imperio Griego",
+                events: [ 
+                    { year: 3779, title: "José el Tobíada (217 a.C.)", desc: "Compró el derecho al cobro de impuestos" }, 
+                    { year: 3936, title: "Odiados por los judíos", desc: "Traidores a su propio pueblo y pecadores deshonestos" } 
+                ] 
+            },
+            { name: "Fariseos", birthAM: 3869, deathAM: 4074, role: "Defensores de la tradición oral.", color: "bg-slate-600", linkRowWith: "Artajerjes", events: [] },
+            { name: "Saduceos", birthAM: 3869, deathAM: 4074, role: "Aristocracia que no creía en resurrección.", color: "bg-slate-500", linkRowWith: "Exilio Babilonia", events: [] },
+            { name: "Herodes El Grande", birthAM: 3967, deathAM: 4000, role: "Rey de Judea. Reconstruyó el Templo.", color: "bg-red-800", linkRowWith: "Zorobabel", events: [] },
+            { name: "JESUCRISTO", birthAM: 4000, deathAM: 4033, role: "EL LIBERTADOR PROMETIDO. Redimió a la humanidad.", events: [{ year: 4033, title: "La Cruz (33 d.C.)", desc: "Victoria sobre la muerte." }], priority: 10 }
+        ];
+
+        const historicalEvents = [
+            { year: 1656, name: "El Diluvio", color: "bg-cyan-500", icon: "fa-water", isMajor: true, borderColor: "border-cyan-500" },
+            { year: 1758, name: "Torre de Babel", color: "bg-amber-600", icon: "fa-gopuram", isMajor: true, borderColor: "border-amber-600" },
+            { year: 2316, name: "Esclavitud Egipto", color: "bg-slate-800", icon: "fa-link" },
+            { year: 2513, name: "Éxodo y La Ley", color: "bg-red-700", icon: "fa-book-open" }, 
+            { year: 3044, name: "Templo Salomón", color: "bg-yellow-600", icon: "fa-synagogue" }, 
+            { year: 3282, name: "Caída de Israel", color: "bg-orange-800", icon: "fa-meteor" },
+            { year: 3417, name: "Exilio de Judá", color: "bg-yellow-800", icon: "fa-fire" },
+            { year: 3466, name: "Decreto de Ciro", color: "bg-purple-800", icon: "fa-scroll" },
+            { year: 3604, name: "400 años de Silencio", color: "bg-red-800", icon: "fa-comment-slash" },
+            { year: 3672, name: "Idioma Griego", color: "bg-blue-800", icon: "fa-language" },
+            { year: 3837, name: "Abominación Desoladora", color: "bg-green-800", icon: "fa-piggy-bank" },
+            { year: 4033, name: "LA CRUZ", color: "bg-red-600", icon: "fa-cross" }
+        ];
+
+        const bibleBooks = [
+            { name: "GÉNESIS", startAM: 0, endAM: 2315, level: 0 },
+            { name: "JOB", startAM: 2200, endAM: 2400, level: 1 },
+            { name: "ÉXODO", startAM: 2315, endAM: 2553, level: 0 },
+            { name: "LEV, NÚM, DEUT", startAM: 2513, endAM: 2553, level: 1 },
+            { name: "JOSUÉ", startAM: 2553, endAM: 2583, level: 0 },
+            { name: "JUECES", startAM: 2583, endAM: 2909, level: 1 },
+            { name: "1er SAMUEL", startAM: 2909, endAM: 2994, level: 0 },
+            { name: "2do SAMUEL", startAM: 2994, endAM: 3034, level: 0 },
+            { name: "SALMOS", startAM: 2994, endAM: 3034, level: 2 },
+            { name: "1er REYES", startAM: 3034, endAM: 3104, level: 0 },
+            { name: "ESDRAS", startAM: 3466, endAM: 3554, level: 0 },
+            { name: "NEHEMÍAS", startAM: 3559, endAM: 3579, level: 1 },
+            { name: "EVANGELIOS", startAM: 4000, endAM: 4033, level: 0 }
+        ];
+
+        const ROW_HEIGHT = 65; 
+        const TOP_OFFSET = 60; 
+
+        function amToAC(am) { return 4004 - am; }
+
+        window.sortedEntities = timelineEntities.sort((a, b) => {
+            const priorityA = a.priority || 0;
+            const priorityB = b.priority || 0;
+            if (priorityA !== priorityB) return priorityB - priorityA;
+            return a.birthAM - b.birthAM;
+        });
+        
+        const entityByName = {};
+        window.sortedEntities.forEach(ent => entityByName[ent.name] = ent);
+
+        const rowsSegments = [];
+        window.sortedEntities.forEach(ent => {
+            let placed = false;
+            const textWidthAM = ent.name.length * 18 + 250; 
+            const startAM = ent.birthAM;
+            const endAM = Math.max(ent.deathAM, ent.birthAM + textWidthAM) + 20;
+
+            if (ent.linkRowWith && entityByName[ent.linkRowWith] && entityByName[ent.linkRowWith].row !== undefined) {
+                ent.row = entityByName[ent.linkRowWith].row;
+                if (!rowsSegments[ent.row]) rowsSegments[ent.row] = [];
+                rowsSegments[ent.row].push({start: startAM, end: endAM});
+                placed = true;
+            } else {
+                for (let i = 0; i < rowsSegments.length; i++) {
+                    const overlaps = rowsSegments[i].some(seg => !(endAM <= seg.start || startAM >= seg.end));
+                    if (!overlaps) {
+                        ent.row = i;
+                        rowsSegments[i].push({start: startAM, end: endAM});
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            if (!placed) {
+                ent.row = rowsSegments.length;
+                rowsSegments.push([{start: startAM, end: endAM}]);
+            }
+        });
+
+        const PEOPLE_START_Y = TOP_OFFSET + 30;
+        const TOTAL_HEIGHT = PEOPLE_START_Y + (rowsSegments.length * ROW_HEIGHT) + 40;
+
+        const chartContainer = document.getElementById('chart-container');
+        chartContainer.style.height = TOTAL_HEIGHT + 'px';
+
+        const setBgPosition = (id, start, end) => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.style.left = (start / MAX_YEAR * 100) + '%';
+                el.style.width = ((end - start) / MAX_YEAR * 100) + '%';
+            }
+        };
+        setBgPosition('bg-esclavitud', 2316, 2513);
+        setBgPosition('bg-jueces', 2553, 2909);
+        setBgPosition('bg-reyes', 2954, 3417);
+        setBgPosition('bg-exilio', 3417, 3466);
+        setBgPosition('bg-jesus', 4000, 4033);
+
+        const btnToggleBooks = document.getElementById('toggle-books-btn');
+        const booksWrapper = document.getElementById('books-wrapper');
+        let booksVisible = false;
+
+        btnToggleBooks.addEventListener('click', () => {
+            booksVisible = !booksVisible;
+            if (booksVisible) {
+                booksWrapper.classList.remove('h-0', 'opacity-0');
+                booksWrapper.classList.add('h-[140px]', 'opacity-100');
+                btnToggleBooks.classList.add('bg-amber-100');
+            } else {
+                booksWrapper.classList.add('h-0', 'opacity-0');
+                booksWrapper.classList.remove('h-[140px]', 'opacity-100');
+                btnToggleBooks.classList.remove('bg-amber-100');
+            }
+            chartContainer.style.height = `${TOTAL_HEIGHT + (booksVisible ? 140 : 0)}px`;
+        });
+
+        const gridBg = document.getElementById('grid-bg');
+        const gridTopLabels = document.getElementById('grid-top-labels');
+        const gridBottomLabels = document.getElementById('grid-bottom-labels');
+        let gridHtml = '', topLabelsHtml = '', bottomLabelsHtml = '';
+
+        for(let year = 0; year <= MAX_YEAR; year += 100) {
+            const leftPercent = (year / MAX_YEAR) * 100;
+            const yearAC = amToAC(year);
+            const acText = yearAC >= 0 ? `${yearAC} a.C.` : `${Math.abs(yearAC)} d.C.`;
+            
+            gridHtml += `<div class="absolute top-0 bottom-0 border-l border-slate-300 border-dashed z-0" style="left: ${leftPercent}%;"></div>`;
+            const labelContent = `<div class="absolute -translate-x-1/2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-slate-300 z-10 flex flex-col items-center pointer-events-auto" style="left: ${leftPercent}%;">
+                    <span class="text-[11px] text-slate-800 font-black leading-none">${year} AM</span>
+                    <span class="text-[11px] text-slate-500 font-bold leading-none mt-1">${acText}</span>
+                </div>`;
+            topLabelsHtml += labelContent.replace('class="absolute', 'class="absolute top-2');
+            bottomLabelsHtml += labelContent.replace('class="absolute', 'class="absolute bottom-4');
+        }
+        gridBg.innerHTML = gridHtml;
+        gridTopLabels.innerHTML = topLabelsHtml;
+        gridBottomLabels.innerHTML = bottomLabelsHtml;
+
+        const eventsContainer = document.getElementById('events-container');
+        let eventsHtml = '';
+        historicalEvents.forEach(ev => {
+            const leftPercent = (ev.year / MAX_YEAR) * 100;
+            const topClass = ev.isCross ? 'top-[80px] border-2 border-red-600 shadow-md z-50 bg-white' : (ev.isMajor ? `top-[25px] border-2 ${ev.borderColor} shadow-md scale-110` : 'top-[35px] border border-slate-200 shadow');
+            
+            eventsHtml += `<div class="absolute ${ev.isCross ? 'top-0 bottom-0 w-[6px] opacity-90 shadow-[0_0_15px_rgba(220,38,38,0.9)] z-0 bg-red-600' : (ev.isMajor ? 'top-[10px] bottom-[20px] w-[5px] opacity-70 shadow-[0_0_8px_currentColor]' : 'top-[20px] bottom-[20px] w-[3px] opacity-30')} ${ev.color} z-10 -translate-x-1/2 transition-all" style="left: ${leftPercent}%;"></div>
+                <div class="absolute ${topClass} -translate-x-1/2 bg-white px-2 py-1 rounded z-20 flex flex-col items-center" style="left: ${leftPercent}%;">
+                    <i class="fas ${ev.icon} ${ev.color.replace('bg-', 'text-')} mb-0.5 text-base"></i>
+                    <span class="${ev.isCross ? 'text-[11px] text-red-700' : (ev.isMajor ? 'text-[11px]' : 'text-[10px]')} font-bold whitespace-nowrap text-slate-800">${ev.name}</span>
+                </div>`;
+        });
+        eventsContainer.innerHTML = eventsHtml;
+
+        // Funciones para el resaltado en grupo del mensaje oculto
+        window.highlightAllMessages = () => {
+            document.querySelectorAll('.hidden-message-part').forEach(el => el.classList.add('active-group'));
+        };
+        
+        window.unhighlightAllMessages = () => {
+            document.querySelectorAll('.hidden-message-part').forEach(el => el.classList.remove('active-group'));
+        };
+
+        const barsContainer = document.getElementById('bars-container');
+        window.sortedEntities.forEach((ent, index) => {
+            const startPct = (ent.birthAM / MAX_YEAR) * 100;
+            const widthPct = ((ent.deathAM - ent.birthAM) / MAX_YEAR) * 100;
+            const isGlowing = ent.name === "JESUCRISTO" || ent.name === "Enoc";
+            const topY = PEOPLE_START_Y + (ent.row * ROW_HEIGHT);
+            
+            const barStyles = isGlowing 
+                ? "bg-gradient-to-r from-orange-400 via-orange-600 to-red-600 border border-orange-500 jesus-glow" 
+                : (ent.color || "bg-blue-500");
+            
+            let barHeight = 6;
+
+            if (isGlowing) {
+                if (ent.name === "JESUCRISTO") barHeight = 16;
+                if (ent.name === "Enoc") barHeight = 8;
+            }
+
+            let iconColorClass = ent.color || "bg-blue-500";
+            if (isGlowing) {
+                iconColorClass = "bg-orange-600";
+            }
+            
+            // Construir el HTML de la frase oculta si existe
+            const hiddenMsgHtml = ent.hiddenMessage 
+                ? `<div class="hidden-message-part whitespace-nowrap pointer-events-auto" onmouseenter="highlightAllMessages()" onmouseleave="unhighlightAllMessages()">${ent.hiddenMessage}</div>` 
+                : '';
+            
+            let eventsDotsHtml = '';
+            if (ent.events) {
+                ent.events.forEach((ev) => {
+                    const evPct = ((Math.max(ent.birthAM, ev.year) - ent.birthAM) / (ent.deathAM - ent.birthAM)) * 100;
+                    const safeTitle = (ev.title || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, ' ');
+                    const safeDesc = (ev.desc || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, ' ');
+
+                    eventsDotsHtml += `<div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 event-diamond rotate-45 cursor-help hover:scale-150 transition-transform z-40" 
+                             style="left: ${evPct}%;" 
+                             onmouseenter="showEventTooltip(event, '${safeTitle}', '${safeDesc}')" 
+                             onmouseleave="hideEventTooltip()"></div>`;
+                });
+            }
+
+            const iconHtml = ent.isEmpire 
+                ? `<i class="fas ${ent.icon} text-[11px] ${ent.color.replace('bg-', 'text-')} shrink-0"></i>`
+                : `<div class="w-4 h-4 rounded-full ${iconColorClass} flex items-center justify-center shrink-0 shadow-sm border border-white"><i class="fas fa-user text-[8px] text-white"></i></div>`;
+
+            barsContainer.insertAdjacentHTML('beforeend', `<div class="patriarch-bar absolute group z-30 flex items-center pointer-events-none" style="left: ${startPct}%; top: ${topY}px; width: ${widthPct}%; height: 40px;" data-birth="${ent.birthAM}" data-death="${ent.deathAM}">
+                    <div class="absolute left-0 top-[30px] flex items-center gap-1.5 name-container z-50 pointer-events-auto">
+                        <div class="flex items-center gap-1.5" onmouseenter="showTooltip(event, ${index})" onmouseleave="hideTooltip()">
+                            ${iconHtml}
+                            <div class="name-label text-[13px] font-bold text-slate-800 whitespace-nowrap tracking-wide uppercase px-1.5 py-0.5 rounded transition-all duration-200 bg-white/60 backdrop-blur-[2px] pointer-events-auto">${ent.name}</div>
+                        </div>
+                        ${hiddenMsgHtml}
+                    </div>
+                    <div class="bar-line w-full ${barStyles} rounded-full relative transition-all duration-300 pointer-events-auto shadow-sm" style="height: ${barHeight}px;">${eventsDotsHtml}</div>
+                </div>`);
+        });
+
+        const booksContainer = document.getElementById('books-container');
+        let booksHtml = '';
+        bibleBooks.forEach(book => {
+            const startPct = (book.startAM / MAX_YEAR) * 100;
+            const widthPct = ((book.endAM - book.startAM) / MAX_YEAR) * 100;
+            booksHtml += `<div class="absolute flex flex-col items-center group/book hover:z-50 pointer-events-auto" style="left: ${startPct}%; width: ${widthPct}%; top: ${book.level * 26}px;">
+                    <div class="w-full h-[3px] bg-amber-800/50 rounded-full group-hover/book:bg-amber-600 group-hover/book:h-[5px] transition-all"></div>
+                    <span class="text-[10px] font-bold text-amber-900 mt-0.5 px-2 bg-white/90 border border-amber-200/50 rounded shadow-sm whitespace-nowrap group-hover/book:bg-amber-100 group-hover/book:scale-110 transition-all origin-top cursor-default">${book.name}</span>
+                </div>`;
+        });
+        booksContainer.innerHTML = booksHtml;
+
+        const zoomSlider = document.getElementById('zoom-slider');
+        zoomSlider.addEventListener('input', (e) => chartContainer.style.width = e.target.value + 'px');
+
+        const drawArea = document.getElementById('chart-draw-area');
+        const timeCursor = document.getElementById('time-cursor');
+        const tcLabels = { amT: document.getElementById('tc-am-top'), acT: document.getElementById('tc-ac-top'), amB: document.getElementById('tc-am-bottom'), acB: document.getElementById('tc-ac-bottom') };
+        
+        drawArea.addEventListener('mousemove', (e) => {
+            const rect = drawArea.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            const pct = Math.max(0, Math.min(1, x / rect.width));
+            const year = Math.round(pct * MAX_YEAR);
+            const yearAC = amToAC(year);
+            const acText = yearAC >= 0 ? (yearAC + ' a.C.') : (Math.abs(yearAC) + ' d.C.');
+
+            timeCursor.style.left = (pct * 100) + '%';
+            tcLabels.amT.innerText = tcLabels.amB.innerText = year + ' AM';
+            tcLabels.acT.innerText = tcLabels.acB.innerText = acText;
+            timeCursor.classList.remove('hidden');
+
+            document.querySelectorAll('.patriarch-bar').forEach(bar => {
+                const birth = parseInt(bar.getAttribute('data-birth')), death = parseInt(bar.getAttribute('data-death'));
+                bar.classList.toggle('highlighted', year >= birth && year <= death);
+            });
+        });
+
+        drawArea.addEventListener('mouseleave', () => {
+            timeCursor.classList.add('hidden');
+            document.querySelectorAll('.patriarch-bar').forEach(bar => bar.classList.remove('highlighted'));
+        });
+
+        window.showTooltip = (e, i) => {
+            const p = window.sortedEntities[i];
+            const age = p.deathAM - p.birthAM;
+            const birthAC = amToAC(p.birthAM);
+            const deathAC = amToAC(p.deathAM);
+            const birthLabel = birthAC >= 0 ? `${birthAC} a.C.` : `${Math.abs(birthAC)} d.C.`;
+            const deathLabel = deathAC >= 0 ? `${deathAC} a.C.` : `${Math.abs(deathAC)} d.C.`;
+
+            document.getElementById('tt-age').innerText = `${age} años (${birthLabel} - ${deathLabel})`;
+            document.getElementById('tt-role').innerText = p.role;
+            const tt = document.getElementById('tooltip');
+            tt.style.left = e.clientX + 'px'; tt.style.top = (e.clientY - 15) + 'px'; tt.style.opacity = '1';
+        };
+        window.hideTooltip = () => document.getElementById('tooltip').style.opacity = '0';
+
+        window.showEventTooltip = (e, title, desc) => {
+            document.getElementById('ev-tt-title').innerText = title;
+            document.getElementById('ev-tt-desc').innerText = desc;
+            const ett = document.getElementById('event-tooltip');
+            ett.style.left = e.clientX + 'px'; ett.style.top = (e.clientY - 30) + 'px'; ett.style.opacity = '1';
+        };
+        window.hideEventTooltip = () => document.getElementById('event-tooltip').style.opacity = '0';
+    </script>
+</body>
+</html>
